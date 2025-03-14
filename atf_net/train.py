@@ -17,7 +17,7 @@ from tqdm import tqdm
 # print('USE GPU ', opt.gpu_id)
 os.environ["OMP_NUM_THREADS"] = "1"
 
-DEVICE = torch.device("mps")
+DEVICE = torch.device("cuda")
 
 # cudnn.benchmark = True
 
@@ -43,22 +43,22 @@ total_iters = 7000
 
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_iters, eta_min=1e-6)
 
-#set the path
-train_image_root = opt.rgb_label_root
-train_gt_root    = opt.gt_label_root
-train_depth_root = opt.depth_label_root
+# #set the path
+# train_image_root = opt.rgb_label_root
+# train_gt_root    = opt.gt_label_root
+# train_depth_root = opt.depth_label_root
 
-val_image_root   = train_image_root.replace('/train', '/test')
-val_gt_root      = opt.val_gt_root
-val_depth_root   = opt.val_depth_root
-save_path        = opt.save_path
+# val_image_root   = train_image_root.replace('/train', '/test')
+# val_gt_root      = opt.val_gt_root
+# val_depth_root   = opt.val_depth_root
+save_path        = os.path.join(opt.save_path, opt.dataset)
 
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
 print('load data...')
-train_loader = get_loader(train_image_root, train_gt_root,train_depth_root, batchsize=opt.batchsize, trainsize=opt.trainsize)
-test_loader  = test_dataset(val_image_root, val_gt_root,val_depth_root, opt.trainsize)
+train_loader = get_loader(opt.dataset_root, opt.dataset, batchsize=opt.batchsize, trainsize=opt.trainsize)
+# test_loader  = test_dataset(val_image_root, val_gt_root,val_depth_root, opt.trainsize)
 total_step   = len(train_loader)
 
 logging.basicConfig(filename=save_path+'log.log',format='[%(asctime)s-%(filename)s-%(levelname)s:%(message)s]', level = logging.INFO,filemode='a',datefmt='%Y-%m-%d %I:%M:%S %p')
@@ -146,38 +146,38 @@ def train(train_loader, model, optimizer, epoch, save_path):
         print('Keyboard Interrupt: save model and exit.')
         raise
         
-#test function
-def val(test_loader,model,epoch,save_path):
-    global best_mae,best_epoch
-    model.eval()
-    with torch.no_grad():
-        mae_sum = 0
-        for i in tqdm(range(test_loader.size)):
-            image, gt, depth, flow, name, img_for_post = test_loader.load_data()
-            gt      = np.asarray(gt, np.float32)
-            gt     /= (gt.max() + 1e-8)
-            image   = image.cuda()
-            depth   = depth.cuda()
-            flow    = flow.cuda()
-            res = model(image, depth, flow)[-1]
-            res     = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
-            res     = res.sigmoid().data.cpu().numpy().squeeze()
-            res     = (res >= 0.5).astype(np.uint8)
+# #test function
+# def val(test_loader,model,epoch,save_path):
+#     global best_mae,best_epoch
+#     model.eval()
+#     with torch.no_grad():
+#         mae_sum = 0
+#         for i in tqdm(range(test_loader.size)):
+#             image, gt, depth, flow, name, img_for_post = test_loader.load_data()
+#             gt      = np.asarray(gt, np.float32)
+#             gt     /= (gt.max() + 1e-8)
+#             image   = image.cuda()
+#             depth   = depth.cuda()
+#             flow    = flow.cuda()
+#             res = model(image, depth, flow)[-1]
+#             res     = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
+#             res     = res.sigmoid().data.cpu().numpy().squeeze()
+#             res     = (res >= 0.5).astype(np.uint8)
 
-            mae_sum += np.mean(np.abs(res-gt))
+#             mae_sum += np.mean(np.abs(res-gt))
         
-        mae = mae_sum/test_loader.size
+#         mae = mae_sum/test_loader.size
 
-        print('Epoch: {} MAE: {}, best MAE: {} bestEpoch: {}'.format(epoch, mae, best_mae, best_epoch))
-        if epoch==1:
-            best_mae = mae
-        else:
-            if mae < best_mae:
-                best_mae = mae
-                best_epoch = epoch
-                torch.save(model.state_dict(), save_path+'epoch_best.pth')
-                print('best epoch:{}'.format(epoch))
-        logging.info('#TEST#:Epoch: {} MAE: {}, best MAE: {} bestEpoch: {}'.format(epoch, mae, best_mae, best_epoch))
+#         print('Epoch: {} MAE: {}, best MAE: {} bestEpoch: {}'.format(epoch, mae, best_mae, best_epoch))
+#         if epoch==1:
+#             best_mae = mae
+#         else:
+#             if mae < best_mae:
+#                 best_mae = mae
+#                 best_epoch = epoch
+#                 torch.save(model.state_dict(), save_path+'epoch_best.pth')
+#                 print('best epoch:{}'.format(epoch))
+#         logging.info('#TEST#:Epoch: {} MAE: {}, best MAE: {} bestEpoch: {}'.format(epoch, mae, best_mae, best_epoch))
  
 if __name__ == '__main__':
     print("Start train...")

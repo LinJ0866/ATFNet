@@ -86,20 +86,73 @@ def randomPeper(img):
 from glob import glob
 
 class SalObjDataset(data.Dataset):
-    def __init__(self, image_root, gt_root,depth_root, trainsize):
+    def __init__(self, dataset_root, dataset, trainsize, mode):
         self.trainsize = trainsize
         self.images = []
         self.gts = []
         self.depths = []
         self.flows = []
 
-        self.images = sorted(glob(image_root + "/*/rgb/*png"))
-        print(f"found {len(self.images)} images")
+        if dataset == 'rdvs':
+            lable_rgb = 'rgb'
+            lable_depth = 'Depth'
+            lable_gt = 'ground-truth'
+            lable_flow = 'FLOW'
 
-        for x in self.images:
-            self.gts.append(x.replace("/rgb/", "/gt/"))
-            self.depths.append(x.replace("/rgb/", "/depth/"))
-            self.flows.append(x.replace("/rgb/", "/").replace("/train/", "/train_flow/"))
+            if mode == 'train':
+                data_dir = os.path.join(dataset_root, 'RDVS/train')
+            else:
+                data_dir = os.path.join(dataset_root, 'RDVS/test')
+        elif dataset == 'vidsod_100':
+            lable_rgb = 'rgb'
+            lable_depth = 'depth'
+            lable_gt = 'gt'
+            lable_flow = 'flow'
+            
+            if mode == 'train':
+                data_dir = os.path.join(dataset_root, 'vidsod_100/train')
+                data_dir = '/home/linj/workspace/vsod/datasets/vidsod_100/train'
+            else:
+                data_dir = os.path.join(dataset_root, 'vidsod_100/test')
+        elif dataset == 'dvisal':
+            lable_rgb = 'RGB'
+            lable_depth = 'Depth'
+            lable_gt = 'GT'
+            lable_flow = 'flow'
+
+            data_dir = os.path.join(dataset_root, 'DViSal_dataset/data')
+
+            if mode == 'train':
+                dvi_mode = 'train'
+            else:
+                dvi_mode = 'test_all'
+        else:
+            raise 'dataset is not support now.'
+        
+        if dataset == 'dvisal':
+            with open(os.path.join(data_dir, '../', dvi_mode+'.txt'), mode='r') as f:
+                subsets = set(f.read().splitlines())
+        else:
+            subsets = os.listdir(data_dir)
+        
+        for video in subsets:
+            video_path = os.path.join(data_dir, video)
+            rgb_path = os.path.join(video_path, lable_rgb)
+            depth_path = os.path.join(video_path, lable_depth)
+            gt_path = os.path.join(video_path, lable_gt)
+            flow_path = os.path.join(video_path, lable_flow)
+            frames = os.listdir(rgb_path)
+            frames = sorted(frames)
+            for frame in frames[:-1]:
+                data = {}
+                img_file = os.path.join(rgb_path, frame)
+                self.images.append(img_file)
+                if os.path.isfile(img_file):
+                    self.depths.append(os.path.join(depth_path, frame.replace('jpg', 'png')))
+                    self.gts.append(os.path.join(gt_path, frame.replace('jpg', 'png')))
+                    self.flows.append(os.path.join(flow_path, frame))
+                    
+        print(f"found {len(self.images)} images")
 
         self.filter_files()
         self.size = len(self.images)
@@ -181,9 +234,9 @@ class SalObjDataset(data.Dataset):
         return self.size
 
 #dataloader for training
-def get_loader(image_root, gt_root,depth_root, batchsize, trainsize, shuffle=True, num_workers=1, pin_memory=False):
+def get_loader(data_root, dataset, batchsize, trainsize, shuffle=True, num_workers=1, pin_memory=False):
 
-    dataset = SalObjDataset(image_root, gt_root, depth_root,trainsize)
+    dataset = SalObjDataset(data_root, dataset, trainsize, 'train')
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batchsize,
                                   shuffle=shuffle,

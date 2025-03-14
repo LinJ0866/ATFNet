@@ -2,6 +2,8 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--dataset_root', type=str, default='../data')
+parser.add_argument('--dataset', type=str, choices=['rdvs', 'vidsod_100', 'dvisal'])
 parser.add_argument('--epoch',       type=int,   default=15,   help='epoch number')
 parser.add_argument('--lr',          type=float, default=2e-4,  help='learning rate')
 parser.add_argument('--batchsize',   type=int,   default=5,    help='training batch size')
